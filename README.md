@@ -2,6 +2,11 @@
 
 A GUI application for [wstunnel](https://github.com/erebe/wstunnel) on Android, built with Flutter. This project provides a user-friendly interface to run wstunnel as a native Android application, eliminating the need to use console binaries within Termux.
 
+## Screenshots
+
+<img src="docs/images/screenshot-01.jpg" width="50%">
+<img src="docs/images/screenshot-02.jpg" width="50%">
+
 ## Overview
 
 This is a GUI client for wstunnel on Android, built on top of the excellent library available at [https://github.com/erebe/wstunnel](https://github.com/erebe/wstunnel).

@@ -1,0 +1,114 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.3'
+          channel: 'stable'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          ndk-version: '28.2.13676358'
+          components: |
+            platform-tools
+            build-tools;34.0.0
+            platforms;android-34
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.90.0
+
+      - name: Add Rust target for Android
+        run: rustup target add aarch64-linux-android
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: ${{ runner.os }}-rust-${{ hashFiles('rust/wstunnel/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-rust-
+
+      - name: Configure Android NDK environment
+        run: |
+          ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/28.2.13676358"
+          NDK_BIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          TARGET_CC="$NDK_BIN/aarch64-linux-android21-clang"
+          TARGET_CXX="$NDK_BIN/aarch64-linux-android21-clang++"
+          TARGET_AR="$NDK_BIN/llvm-ar"
+          
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT" >> $GITHUB_ENV
+          echo "PATH=$NDK_BIN:$PATH" >> $GITHUB_ENV
+          echo "TARGET_CC=$TARGET_CC" >> $GITHUB_ENV
+          echo "TARGET_CXX=$TARGET_CXX" >> $GITHUB_ENV
+          echo "TARGET_AR=$TARGET_AR" >> $GITHUB_ENV
+          echo "CC_aarch64_linux_android=$TARGET_CC" >> $GITHUB_ENV
+          echo "CXX_aarch64_linux_android=$TARGET_CXX" >> $GITHUB_ENV
+          echo "AR_aarch64_linux_android=$TARGET_AR" >> $GITHUB_ENV
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TARGET_CC" >> $GITHUB_ENV
+          
+          # Verify NDK path exists
+          if [ ! -d "$ANDROID_NDK_ROOT" ]; then
+            echo "Error: Android NDK not found at $ANDROID_NDK_ROOT"
+            exit 1
+          fi
+          
+          # Verify tools exist
+          if [ ! -f "$TARGET_CC" ]; then
+            echo "Error: Clang not found at $TARGET_CC"
+            exit 1
+          fi
+
+      - name: Build Rust library
+        run: |
+          cd rust/wstunnel
+          cargo build --target aarch64-linux-android --release
+
+      - name: Copy library to Android project
+        run: |
+          chmod +x copy_lib.sh
+          ./copy_lib.sh
+
+      - name: Verify Flutter setup
+        run: |
+          flutter doctor -v
+          flutter --version
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Flutter APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+

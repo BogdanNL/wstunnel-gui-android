@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+
+members = ["wstunnel", "wstunnel-cli"]
+
+[workspace.dependencies]
+
+[profile.release]
+lto = "fat"
+panic = "abort"
+codegen-units = 1
+opt-level = 3
+debug = 0
+strip = "symbols"
+
+[profile.release-with-symbols]
+inherits = "release"
+strip = false
